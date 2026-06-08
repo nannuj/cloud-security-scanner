@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CloudSec Scanner — Shodan-powered Vulnerability Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;
+  --surface:#0d1117;
+  --surface2:#111827;
+  --surface3:#1a2236;
+  --border:#1e2d4a;
+  --border2:#253553;
+  --accent:#00e5ff;
+  --accent2:#7c3aed;
+  --accent3:#10b981;
+  --red:#ef4444;
+  --amber:#f59e0b;
+  --green:#10b981;
+  --purple:#a78bfa;
+  --text:#e2e8f0;
+  --muted:#64748b;
+  --dim:#334155;
+  --mono:'JetBrains Mono',monospace;
+  --display:'Syne',sans-serif;
+}
+html,body{
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--display);
+  font-size:14px;
+  line-height:1.5;
+  overflow-x:hidden;
+}
+
+/* ─── SCANLINE OVERLAY ─── */
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.015) 2px,rgba(0,229,255,.015) 4px);
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ─── LAYOUT ─── */
+.shell{
+  position:relative;
+  z-index:1;
+  max-width:1280px;
+  margin:0 auto;
+  padding:24px 20px;
+}
+
+/* ─── HEADER ─── */
+.header{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  margin-bottom:24px;
+  padding-bottom:20px;
+  border-bottom:1px solid var(--border);
+}
+.logo{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.logo-hex{
+  width:38px;height:38px;
+  background:linear-gradient(135deg,#00e5ff22,#7c3aed33);
+  border:1px solid var(--accent);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+  box-shadow:0 0 20px #00e5ff22;
+}
+.logo-name{
+  font-family:var(--display);
+  font-size:20px;font-weight:800;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+.logo-sub{
+  font-family:var(--mono);
+  font-size:10px;color:var(--muted);
+  letter-spacing:1px;margin-top:2px;
+}
+.header-tags{
+  display:flex;gap:8px;flex-wrap:wrap;
+}
+.htag{
+  font-family:var(--mono);font-size:10px;
+  padding:3px 10px;border-radius:4px;
+  letter-spacing:1px;
+}
+.htag-cyan{background:#00e5ff11;color:var(--accent);border:1px solid #00e5ff33}
+.htag-purple{background:#7c3aed11;color:var(--purple);border:1px solid #7c3aed33}
+.htag-green{background:#10b98111;color:#6ee7b7;border:1px solid #10b98133}
+.header-right{margin-left:auto;text-align:right}
+.clock{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ─── INPUT PANEL ─── */
+.input-panel{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:20px;
+  margin-bottom:20px;
+}
+.input-title{
+  font-family:var(--mono);font-size:10px;
+  color:var(--muted);letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:14px;
+}
+.input-row{
+  display:flex;gap:10px;flex-wrap:wrap;
+  align-items:flex-end;
+}
+.field{flex:1;min-width:200px}
+.field-api{width:260px;flex:none}
+.field label{
+  display:block;
+  font-family:var(--mono);font-size:10px;
+  color:var(--muted);letter-spacing:1px;
+  margin-bottom:6px;
+}
+.field input{
+  width:100%;
+  background:var(--surface3);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:11px 14px;
+  font-family:var(--mono);font-size:13px;
+  color:var(--text);
+  outline:none;
+  transition:border .2s,box-shadow .2s;
+}
+.field input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px #00e5ff11;
+}
+.field input::placeholder{color:var(--muted);font-size:11px}
+.btn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{
+  padding:11px 22px;border-radius:8px;
+  font-family:var(--display);font-size:12px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;
+  cursor:pointer;border:none;
+  transition:all .2s;white-space:nowrap;
+}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{
+  background:var(--accent);color:#000;
+  box-shadow:0 0 20px #00e5ff33;
+}
+.btn-primary:hover:not(:disabled){box-shadow:0 0 30px #00e5ff55;opacity:.9}
+.btn-demo{
+  background:transparent;
+  color:var(--purple);
+  border:1px solid var(--accent2);
+}
+.btn-demo:hover{background:#7c3aed11}
+.btn-export{
+  background:transparent;
+  color:var(--accent3);
+  border:1px solid var(--accent3);
+  display:none;
+}
+.btn-export:hover{background:#10b98111}
+.btn-clear{
+  background:transparent;
+  color:var(--muted);
+  border:1px solid var(--border2);
+  display:none;
+}
+.btn-clear:hover{background:#ffffff08}
+.shodan-link{
+  font-family:var(--mono);font-size:11px;
+  color:var(--muted);margin-top:10px;
+}
+.shodan-link a{color:var(--accent);text-decoration:none}
+.shodan-link a:hover{text-decoration:underline}
+
+/* ─── PROGRESS / STATUS ─── */
+.status-bar{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:16px;
+  font-family:var(--mono);font-size:11px;
+}
+.led{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.led-idle{background:var(--muted)}
+.led-scan{background:var(--amber);animation:blink 1s ease-in-out infinite}
+.led-ok{background:var(--green);box-shadow:0 0 8px #10b98177}
+.led-err{background:var(--red);box-shadow:0 0 8px #ef444477}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.status-txt{color:var(--muted)}
+.prog-wrap{
+  flex:1;height:3px;background:var(--border);
+  border-radius:2px;overflow:hidden;
+}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:2px;transition:width .5s}
+.prog-scan{height:100%;background:var(--accent);position:relative;animation:sweep 1.4s linear infinite}
+@keyframes sweep{0%{margin-left:-40%;width:40%}100%{margin-left:100%;width:40%}}
+
+/* ─── TABS ─── */
+.tabs{
+  display:flex;gap:0;
+  border-bottom:1px solid var(--border);
+  margin-bottom:20px;
+  overflow-x:auto;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  padding:10px 18px;
+  font-family:var(--display);font-size:11px;font-weight:600;
+  letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:all .2s;white-space:nowrap;
+  user-select:none;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-count{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border-radius:3px;
+  font-size:10px;font-weight:700;
+  background:var(--surface3);
+  margin-left:6px;
+}
+.tab.active .tab-count{background:#00e5ff22;color:var(--accent)}
+.tab-count.red{background:#ef444422;color:#fca5a5}
+
+/* ─── SUMMARY STATS ─── */
+.stats-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:10px;
+  margin-bottom:20px;
+}
+.stat-box{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:14px 16px;
+  position:relative;
+  overflow:hidden;
+}
+.stat-box::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;height:2px;
+}
+.stat-box.sb-cyan::before{background:var(--accent)}
+.stat-box.sb-red::before{background:var(--red)}
+.stat-box.sb-amber::before{background:var(--amber)}
+.stat-box.sb-green::before{background:var(--green)}
+.stat-box.sb-purple::before{background:var(--purple)}
+.stat-num{
+  font-family:var(--mono);font-size:28px;font-weight:700;
+  line-height:1;margin-bottom:4px;
+}
+.stat-label{
+  font-family:var(--mono);font-size:10px;
+  color:var(--muted);letter-spacing:1.5px;
+  text-transform:uppercase;
+}
+.n-cyan{color:var(--accent)}
+.n-red{color:var(--red)}
+.n-amber{color:var(--amber)}
+.n-green{color:var(--green)}
+.n-purple{color:var(--purple)}
+
+/* ─── MAIN GRID ─── */
+.main-grid{
+  display:grid;
+  grid-template-columns:300px 1fr;
+  gap:16px;
+}
+@media(max-width:800px){.main-grid{grid-template-columns:1fr}}
+
+/* ─── SIDEBAR ─── */
+.sidebar{display:flex;flex-direction:column;gap:14px}
+.panel{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:14px;
+}
+.panel-title{
+  font-family:var(--mono);font-size:10px;
+  color:var(--muted);letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:12px;
+  padding-bottom:8px;
+  border-bottom:1px solid var(--border);
+}
+.info-row{
+  display:flex;justify-content:space-between;
+  align-items:flex-start;
+  padding:5px 0;
+  border-bottom:1px solid var(--border);
+  gap:10px;
+}
+.info-row:last-child{border-bottom:none}
+.ik{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
+.iv{font-family:var(--mono);font-size:10px;color:var(--text);text-align:right;word-break:break-all}
+
+/* ─── RISK RING ─── */
+.risk-box{
+  display:flex;align-items:center;gap:16px;
+  padding:16px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  margin-bottom:16px;
+}
+.ring-wrap{position:relative;width:88px;height:88px;flex-shrink:0}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-center{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+}
+.ring-num{
+  font-family:var(--mono);font-size:20px;font-weight:700;
+  line-height:1;
+}
+.ring-lbl{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-top:2px}
+.risk-info{flex:1}
+.risk-grade{
+  font-family:var(--display);font-size:18px;font-weight:800;
+  letter-spacing:2px;margin-bottom:4px;
+}
+.risk-desc{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6}
+.risk-action{
+  display:inline-flex;align-items:center;gap:6px;
+  margin-top:8px;padding:4px 10px;border-radius:4px;
+  font-family:var(--mono);font-size:10px;font-weight:600;
+}
+.ra-crit{background:#ef444422;color:#fca5a5;border:1px solid #ef444444}
+.ra-high{background:#f59e0b22;color:#fcd34d;border:1px solid #f59e0b44}
+.ra-med{background:#f59e0b11;color:#fbbf24;border:1px solid #f59e0b22}
+.ra-low{background:#10b98122;color:#6ee7b7;border:1px solid #10b98144}
+
+/* ─── PORT LIST ─── */
+.port-scroll{max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.port-scroll::-webkit-scrollbar{width:3px}
+.port-scroll::-webkit-scrollbar-thumb{background:var(--dim)}
+.port-pill{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:6px;
+  font-family:var(--mono);font-size:11px;
+  transition:border .15s;
+}
+.port-pill:hover{border-color:var(--border2)}
+.pp-num{color:var(--accent);font-weight:600;min-width:44px}
+.pp-svc{color:var(--text);flex:1}
+.pp-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-open{background:var(--green)}
+.dot-high{background:var(--amber)}
+.dot-crit{background:var(--red)}
+
+/* ─── CVE CARDS ─── */
+.vuln-list{display:flex;flex-direction:column;gap:12px}
+.vuln-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:16px;
+  transition:border .2s;
+  position:relative;
+  overflow:hidden;
+}
+.vuln-card::before{
+  content:'';
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:3px;
+}
+.vc-crit::before{background:var(--red)}
+.vc-high::before{background:var(--amber)}
+.vc-med::before{background:#f59e0b88}
+.vc-low::before{background:var(--green)}
+.vuln-card:hover{border-color:var(--border2)}
+.vh{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
+.vi{
+  width:34px;height:34px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:15px;
+}
+.vi-crit{background:#ef444422;border:1px solid #ef444433}
+.vi-high{background:#f59e0b22;border:1px solid #f59e0b33}
+.vi-med{background:#f59e0b11;border:1px solid #f59e0b22}
+.vi-low{background:#10b98122;border:1px solid #10b98133}
+.vm{flex:1}
+.vt{font-size:13px;font-weight:600;margin-bottom:4px}
+.vmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vcve{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.5px}
+.vscore{
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  padding:2px 8px;border-radius:3px;
+}
+.vs-crit{background:#ef444422;color:#fca5a5;border:1px solid #ef444433}
+.vs-high{background:#f59e0b22;color:#fcd34d;border:1px solid #f59e0b33}
+.vs-med{background:#fbbf2422;color:#fde68a;border:1px solid #fbbf2433}
+.vs-low{background:#10b98122;color:#6ee7b7;border:1px solid #10b98133}
+.vport{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.vdesc{font-size:12px;color:var(--muted);line-height:1.65;margin-bottom:10px}
+.vbar-wrap{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.vbar-fill{height:100%;border-radius:2px;transition:width .8s .2s}
+.vbf-red{background:var(--red)}
+.vbf-amber{background:var(--amber)}
+.vbf-cyan{background:var(--accent)}
+.vbar-labels{
+  display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;
+}
+.vref{
+  margin-top:8px;
+  font-family:var(--mono);font-size:10px;color:var(--accent);
+}
+.vref a{color:var(--accent);text-decoration:none}
+.vref a:hover{text-decoration:underline}
+
+/* ─── SERVICES ─── */
+.svc-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  gap:10px;
+}
+.svc-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px 14px;
+}
+.sc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.sc-port{
+  font-family:var(--mono);font-size:11px;
+  color:var(--accent);font-weight:600;
+}
+.sc-name{font-size:13px;font-weight:600}
+.sc-ver{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.sc-cpe{font-family:var(--mono);font-size:9px;color:var(--dim);margin:4px 0;word-break:break-all}
+.sc-banner{
+  font-family:var(--mono);font-size:10px;color:var(--muted);
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:4px;padding:6px 8px;margin-top:6px;
+  line-height:1.5;word-break:break-all;
+  max-height:80px;overflow-y:auto;
+}
+.sc-banner::-webkit-scrollbar{width:2px}
+.sc-banner::-webkit-scrollbar-thumb{background:var(--dim)}
+.sc-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.stag{
+  font-family:var(--mono);font-size:9px;
+  padding:2px 6px;border-radius:3px;letter-spacing:.5px;
+}
+.stag-tls{background:#10b98122;color:#6ee7b7;border:1px solid #10b98133}
+.stag-noauth{background:#ef444422;color:#fca5a5;border:1px solid #ef444433}
+.stag-db{background:#7c3aed22;color:#c4b5fd;border:1px solid #7c3aed33}
+.stag-rdp{background:#f59e0b22;color:#fcd34d;border:1px solid #f59e0b33}
+.stag-generic{background:#ffffff08;color:var(--muted);border:1px solid var(--border)}
+
+/* ─── INTEL ─── */
+.intel-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.intel-grid{grid-template-columns:1fr}}
+.threat-feed-row{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;border-bottom:1px solid var(--border);
+  font-size:12px;
+}
+.threat-feed-row:last-child{border-bottom:none}
+.tfsrc{font-family:var(--mono);font-size:11px;color:var(--text);min-width:130px}
+.tfbar-wrap{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.tfbar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .7s}
+.tfcount{font-family:var(--mono);font-size:10px;color:var(--muted);min-width:28px;text-align:right}
+.geo-flag{font-size:24px;margin-right:4px}
+
+/* ─── RECOMMENDATIONS ─── */
+.rec-list{display:flex;flex-direction:column;gap:8px}
+.rec-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 14px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+}
+.rec-pri{
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  letter-spacing:1px;padding:3px 8px;border-radius:3px;
+  flex-shrink:0;margin-top:1px;
+}
+.rp-crit{background:#ef444433;color:#fca5a5}
+.rp-high{background:#f59e0b33;color:#fcd34d}
+.rp-med{background:#00e5ff11;color:#67e8f9}
+.rp-info{background:#7c3aed22;color:#c4b5fd}
+.rec-text{font-size:12px;color:var(--text);line-height:1.6}
+.rec-text strong{color:var(--amber);font-weight:600}
+.rec-text code{
+  font-family:var(--mono);font-size:11px;
+  background:var(--bg);padding:1px 5px;
+  border-radius:3px;color:var(--accent);
+}
+
+/* ─── LOG ─── */
+.log-panel{
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:14px;
+  font-family:var(--mono);font-size:11px;
+  max-height:500px;overflow-y:auto;
+  line-height:1.7;
+}
+.log-panel::-webkit-scrollbar{width:3px}
+.log-panel::-webkit-scrollbar-thumb{background:var(--dim)}
+.log-ts{color:var(--dim)}
+.log-prompt{color:var(--accent2)}
+.log-ok{color:var(--green)}
+.log-warn{color:var(--amber)}
+.log-err{color:var(--red)}
+.log-info{color:var(--accent)}
+.log-muted{color:var(--muted)}
+
+/* ─── EMPTY / ERROR ─── */
+.empty-state{
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:16px;padding:80px 20px;
+  text-align:center;
+}
+.empty-hex{
+  font-size:48px;opacity:.15;
+  animation:float 3s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.empty-headline{
+  font-family:var(--display);font-size:18px;font-weight:700;
+  color:var(--muted);letter-spacing:1px;
+}
+.empty-sub{
+  font-family:var(--mono);font-size:12px;
+  color:var(--dim);line-height:1.7;max-width:500px;
+}
+.error-panel{
+  background:#ef444411;
+  border:1px solid #ef444433;
+  border-radius:10px;padding:16px 20px;
+}
+.error-title{font-weight:700;color:#fca5a5;margin-bottom:8px;font-size:14px}
+.error-msg{font-family:var(--mono);font-size:12px;color:#fca5a5;margin-bottom:10px}
+.error-help{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7}
+.error-help a{color:var(--accent);text-decoration:none}
+
+/* ─── TAG BADGES ─── */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;border-radius:4px;
+  font-family:var(--mono);font-size:10px;
+}
+.b-tls{background:#10b98122;color:#6ee7b7;border:1px solid #10b98133}
+.b-notls{background:#ef444422;color:#fca5a5;border:1px solid #ef444433}
+.b-cloud{background:#00e5ff11;color:#67e8f9;border:1px solid #00e5ff22}
+.b-tag{background:#ffffff08;color:var(--muted);border:1px solid var(--border)}
+
+/* ─── SCROLLBARS ─── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
+
+/* ─── TOOLTIP ─── */
+.tip{position:relative;cursor:default}
+.tip-text{
+  display:none;position:absolute;
+  bottom:calc(100%+6px);left:50%;transform:translateX(-50%);
+  background:var(--surface2);border:1px solid var(--border2);
+  border-radius:6px;padding:6px 10px;
+  font-family:var(--mono);font-size:10px;color:var(--text);
+  white-space:nowrap;z-index:100;
+  pointer-events:none;
+}
+.tip:hover .tip-text{display:block}
+
+/* ─── EXPORT ─── */
+#exportPanel{
+  display:none;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:16px;
+  margin-top:16px;
+}
+.export-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:12px}
+.exp-btn{
+  background:var(--surface3);
+  border:1px solid var(--border);
+  border-radius:8px;padding:12px;
+  cursor:pointer;text-align:center;
+  transition:border .2s,background .2s;
+  font-family:var(--mono);
+}
+.exp-btn:hover{border-color:var(--border2);background:var(--surface2)}
+.exp-icon{font-size:22px;margin-bottom:6px}
+.exp-name{font-size:12px;color:var(--text);font-weight:600}
+.exp-desc{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:600px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .risk-box{flex-direction:column;text-align:center}
+  .field-api{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-hex">⬡</div>
+      <div>
+        <div class="logo-name">CloudSec</div>
+        <div class="logo-sub">VULNERABILITY SCANNER v2.1</div>
+      </div>
+    </div>
+    <div class="header-tags">
+      <span class="htag htag-cyan">Shodan API</span>
+      <span class="htag htag-purple">CVE Correlation</span>
+      <span class="htag htag-green">Threat Intel</span>
+      <span class="htag htag-cyan">Geo Mapping</span>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock">—</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:2px">UTC LIVE</div>
+    </div>
+  </div>
+
+  <!-- INPUT PANEL -->
+  <div class="input-panel">
+    <div class="input-title">// Scan Configuration</div>
+    <div class="input-row">
+      <div class="field">
+        <label>TARGET — IP ADDRESS OR HOSTNAME</label>
+        <input type="text" id="targetInput" placeholder="e.g.  8.8.8.8  |  scanme.nmap.org  |  192.168.1.1" autocomplete="off" spellcheck="false"/>
+      </div>
+      <div class="field field-api">
+        <label>SHODAN API KEY — <a href="https://account.shodan.io/register" target="_blank" style="color:var(--accent);text-decoration:none">get free key ↗</a></label>
+        <input type="password" id="apiKeyInput" placeholder="paste your Shodan API key here" autocomplete="off"/>
+      </div>
+      <div class="btn-row" style="margin-top:22px">
+        <button class="btn btn-primary" id="scanBtn" onclick="startScan()">▶ SCAN</button>
+        <button class="btn btn-demo" id="demoBtn" onclick="loadDemo()">DEMO</button>
+        <button class="btn btn-export" id="exportBtn" onclick="toggleExport()">EXPORT ↓</button>
+        <button class="btn btn-clear" id="clearBtn" onclick="clearResults()">CLEAR</button>
+      </div>
+    </div>
+    <div class="shodan-link" style="margin-top:10px">
+      Free Shodan account: query your own IPs &amp; common targets.
+      Enterprise key: query any host globally. |
+      <a href="https://account.shodan.io" target="_blank">account.shodan.io ↗</a>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <div class="led led-idle" id="led"></div>
+    <span class="status-txt" id="statusTxt">Ready — enter a target and API key, or try Demo Mode</span>
+    <div class="prog-wrap" id="progWrap" style="display:none">
+      <div id="progFill" class="prog-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="mainContent">
+    <div class="empty-state">
+      <div class="empty-hex">⬡</div>
+      <div class="empty-headline">NO TARGET SCANNED</div>
+      <div class="empty-sub">
+        Enter an IP address or hostname above with your Shodan API key and click Scan.<br>
+        Results include open ports, detected CVEs, service banners, geolocation, threat intelligence feeds, and actionable remediation recommendations.<br><br>
+        <strong style="color:var(--muted)">No API key?</strong> Click <span style="color:var(--purple)">DEMO</span> to see a full simulated scan result.
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT PANEL -->
+  <div id="exportPanel">
+    <div class="panel-title">// Export Report</div>
+    <div class="export-grid">
+      <div class="exp-btn" onclick="exportJSON()">
+        <div class="exp-icon">{ }</div>
+        <div class="exp-name">JSON Report</div>
+        <div class="exp-desc">Full machine-readable data</div>
+      </div>
+      <div class="exp-btn" onclick="exportCSV()">
+        <div class="exp-icon">≡</div>
+        <div class="exp-name">CSV — Ports</div>
+        <div class="exp-desc">Open port list for spreadsheet</div>
+      </div>
+      <div class="exp-btn" onclick="exportCVEcsv()">
+        <div class="exp-icon">⚠</div>
+        <div class="exp-name">CSV — CVEs</div>
+        <div class="exp-desc">Vulnerability list with CVSS</div>
+      </div>
+      <div class="exp-btn" onclick="exportHTML()">
+        <div class="exp-icon">◈</div>
+        <div class="exp-name">HTML Report</div>
+        <div class="exp-desc">Shareable full scan report</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /shell -->
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   CONSTANTS & DATA
+═══════════════════════════════════════════════════════════ */
+const PORT_NAMES = {
+  20:'FTP-Data',21:'FTP',22:'SSH',23:'Telnet',25:'SMTP',53:'DNS',
+  67:'DHCP',68:'DHCP',69:'TFTP',80:'HTTP',110:'POP3',111:'RPC',
+  119:'NNTP',123:'NTP',135:'MS-RPC',137:'NetBIOS-NS',138:'NetBIOS-DG',
+  139:'NetBIOS-SS',143:'IMAP',161:'SNMP',162:'SNMP-Trap',179:'BGP',
+  194:'IRC',389:'LDAP',443:'HTTPS',445:'SMB',465:'SMTPS',514:'Syslog',
+  515:'LPD-Print',587:'SMTP-TLS',631:'IPP-Print',636:'LDAPS',
+  873:'rsync',993:'IMAPS',995:'POP3S',1080:'SOCKS',1194:'OpenVPN',
+  1433:'MS-SQL',1521:'Oracle-DB',1723:'PPTP-VPN',2049:'NFS',
+  2375:'Docker-TCP',2376:'Docker-TLS',2379:'etcd',2380:'etcd-peer',
+  3000:'Dev-Server',3306:'MySQL',3389:'RDP',3690:'SVN',4200:'Angular',
+  4444:'Metasploit',4848:'GlassFish',5000:'Dev/Docker-Reg',
+  5432:'PostgreSQL',5900:'VNC',5984:'CouchDB',5985:'WinRM-HTTP',
+  5986:'WinRM-HTTPS',6379:'Redis',6443:'K8s-API',7001:'WebLogic',
+  7070:'RealMedia',7777:'Dev-Alt',8080:'HTTP-Alt',8443:'HTTPS-Alt',
+  8888:'Jupyter',8983:'Apache-Solr',9000:'PHP-FPM/SonarQube',
+  9090:'Prometheus',9200:'Elasticsearch',9300:'ES-Cluster',
+  10250:'Kubelet',10255:'Kubelet-RO',11211:'Memcached',
+  15672:'RabbitMQ-UI',25565:'Minecraft',27017:'MongoDB',
+  27018:'MongoDB-shard',28015:'RethinkDB',50000:'SAP-Dispatcher',
+  50070:'Hadoop-NameNode',50075:'Hadoop-DataNode',61616:'ActiveMQ'
+};
+const CRITICAL_PORTS = new Set([23,135,445,2375,4444,9200,27017,11211,50070,6443,10250,10255]);
+const HIGH_PORTS = new Set([21,22,3389,5900,6379,1433,3306,5432,5984,2049,161,139,389,636,27018,28015,4848,7001,8888,8983,9090,50000,15672,61616]);
+const CLOUD_ORGS = [
+  ['amazon','AWS'],['google','Google Cloud'],['microsoft','Azure'],
+  ['cloudflare','Cloudflare'],['digitalocean','DigitalOcean'],
+  ['linode','Akamai/Linode'],['vultr','Vultr'],['hetzner','Hetzner'],
+  ['ovh','OVH'],['rackspace','Rackspace'],['fastly','Fastly'],
+  ['akamai','Akamai']
+];
+const COUNTRY_FLAGS = {
+  'United States':'🇺🇸','Germany':'🇩🇪','United Kingdom':'🇬🇧',
+  'France':'🇫🇷','Netherlands':'🇳🇱','Japan':'🇯🇵','China':'🇨🇳',
+  'Russia':'🇷🇺','Canada':'🇨🇦','Australia':'🇦🇺','India':'🇮🇳',
+  'Brazil':'🇧🇷','Singapore':'🇸🇬','South Korea':'🇰🇷','Sweden':'🇸🇪'
+};
+
+/* State */
+let scanData = null;
+let logs = [];
+let currentTab = 'overview';
+
+/* Clock */
+function updateClock(){
+  document.getElementById('clock').textContent = new Date().toUTCString().replace(' GMT','');
+}
+setInterval(updateClock,1000); updateClock();
+
+/* ═══════════════════════════════════════════════════════════
+   LOGGING
+═══════════════════════════════════════════════════════════ */
+function log(msg, type='info'){
+  const ts = new Date().toISOString().substr(11,12);
+  logs.push({ts, msg, type});
+  if(currentTab==='log') renderLog();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STATUS
+═══════════════════════════════════════════════════════════ */
+function setStatus(state, text){
+  const led = document.getElementById('led');
+  const txt = document.getElementById('statusTxt');
+  const pw = document.getElementById('progWrap');
+  led.className = 'led led-' + state;
+  txt.textContent = text;
+  pw.style.display = state==='scan' ? 'block' : 'none';
+}
+function setProgress(pct){
+  const pf = document.getElementById('progFill');
+  if(pct === 'scan'){
+    pf.className = 'prog-scan';
+    pf.style.width = '';
+  } else {
+    pf.className = 'prog-fill';
+    pf.style.width = pct+'%';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN SCAN
+═══════════════════════════════════════════════════════════ */
+async function startScan(){
+  const target = document.getElementById('targetInput').value.trim();
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  if(!target){ alert('Please enter a target IP or hostname.'); return; }
+  if(!apiKey){ alert('Please enter your Shodan API key, or click DEMO for a simulated scan.'); return; }
+
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('demoBtn').disabled = true;
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('clearBtn').style.display = 'none';
+  document.getElementById('exportPanel').style.display = 'none';
+  logs = [];
+
+  setStatus('scan','Scanning ' + target + ' ...');
+  setProgress('scan');
+  renderScanning(target);
+
+  log('Scan initiated: ' + target, 'info');
+  log('Resolving hostname and preparing Shodan query...', 'muted');
+
+  try {
+    log('Querying Shodan /shodan/host/' + target, 'info');
+    const url = `https://api.shodan.io/shodan/host/${encodeURIComponent(target)}?key=${encodeURIComponent(apiKey)}&minify=false`;
+    const res = await fetch(url);
+    if(!res.ok){
+      let errMsg = 'HTTP ' + res.status;
+      try{ const j = await res.json(); errMsg = j.error || errMsg; } catch(e){}
+      throw new Error(errMsg);
+    }
+    const raw = await res.json();
+    log('Response received — processing ' + (raw.data||[]).length + ' service banners', 'ok');
+
+    scanData = processData(raw, target);
+
+    log('Open ports detected: ' + scanData.ports.length, 'ok');
+    if(scanData.critPorts > 0) log(scanData.critPorts + ' CRITICAL port(s) found: ' + scanData.ports.filter(p=>p.risk==='critical').map(p=>p.port).join(', '), 'err');
+    if(scanData.highPorts > 0) log(scanData.highPorts + ' high-risk port(s) found', 'warn');
+    log('CVE correlation complete — ' + scanData.cves.length + ' vulnerabilities', scanData.cves.length>0?'warn':'ok');
+    if(scanData.cves.length > 0){
+      log('Critical CVEs (' + scanData.critCves + '): ' + scanData.cves.filter(c=>c.cvss>=9).map(c=>c.id).join(', '), scanData.critCves>0?'err':'muted');
+    }
+    log('Geo: ' + scanData.city + ', ' + scanData.country + ' | ISP: ' + scanData.isp, 'muted');
+    if(scanData.cloudProvider) log('Cloud provider detected: ' + scanData.cloudProvider, 'info');
+    log('Risk score: ' + scanData.riskScore + '/100 — ' + getRiskLabel(scanData.riskScore), scanData.riskScore>=60?'err':scanData.riskScore>=40?'warn':'ok');
+    log('Scan complete.', 'ok');
+
+    setProgress(100);
+    setStatus('ok', 'Scan complete — ' + target + ' | ' + scanData.ports.length + ' ports | ' + scanData.cves.length + ' CVEs | Risk: ' + scanData.riskScore + '/100');
+    renderResults();
+  } catch(err){
+    log('ERROR: ' + err.message, 'err');
+    setStatus('err','Scan failed: ' + err.message);
+    setProgress(0);
+    renderError(err.message);
+  }
+
+  document.getElementById('scanBtn').disabled = false;
+  document.getElementById('demoBtn').disabled = false;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PROCESS REAL DATA
+═══════════════════════════════════════════════════════════ */
+function processData(raw, target){
+  const portNums = raw.ports || [];
+  const portObjs = portNums.map(p => ({
+    port: p,
+    service: PORT_NAMES[p] || 'unknown',
+    risk: CRITICAL_PORTS.has(p) ? 'critical' : HIGH_PORTS.has(p) ? 'high' : 'open'
+  }));
+
+  const services = [];
+  const cves = [];
+  let hasSsl = false;
+
+  (raw.data||[]).forEach(svc => {
+    if(svc.ssl) hasSsl = true;
+    const noAuth = detectNoAuth(svc);
+    const tags = buildServiceTags(svc, noAuth);
+    services.push({
+      port: svc.port,
+      transport: svc.transport || 'tcp',
+      name: svc.product || svc._shodan?.module || PORT_NAMES[svc.port] || 'unknown',
+      version: svc.version || '',
+      cpe: (svc.cpe||[]).join(' | '),
+      banner: (svc.data||'').substr(0, 400),
+      ssl: !!svc.ssl,
+      sslCert: svc.ssl?.cert || null,
+      noAuth, tags
+    });
+    if(svc.vulns){
+      Object.keys(svc.vulns).forEach(cveId => {
+        const v = svc.vulns[cveId];
+        const cvss = parseFloat(v.cvss || v.cvss3 || 0);
+        cves.push({
+          id: cveId,
+          port: svc.port,
+          service: (svc.product || PORT_NAMES[svc.port] || 'Service') + (svc.version?' '+svc.version:''),
+          cvss, summary: v.summary || 'No summary available.',
+          references: v.references || []
+        });
+      });
+    }
+  });
+
+  cves.sort((a,b) => b.cvss - a.cvss);
+
+  // Risk scoring
+  let risk = 0;
+  cves.forEach(c => {
+    if(c.cvss>=9.0) risk+=18;
+    else if(c.cvss>=7.0) risk+=10;
+    else if(c.cvss>=4.0) risk+=4;
+    else risk+=1;
+  });
+  portObjs.forEach(p => {
+    if(p.risk==='critical') risk+=12;
+    else if(p.risk==='high') risk+=5;
+  });
+  const noAuthServices = services.filter(s=>s.noAuth);
+  risk += noAuthServices.length * 8;
+  risk = Math.min(100, Math.round(risk));
+
+  // Cloud provider
+  const orgLower = ((raw.org||'') + (raw.isp||'')).toLowerCase();
+  let cloudProvider = null;
+  for(const [k,v] of CLOUD_ORGS){ if(orgLower.includes(k)){ cloudProvider=v; break; } }
+
+  // Threat feeds (derived from port exposure)
+  const threatFeeds = buildThreatFeeds(portObjs, cves, services);
+
+  return {
+    target, ip: raw.ip_str || target,
+    hostnames: raw.hostnames || [],
+    country: raw.country_name || 'Unknown',
+    city: raw.city || 'Unknown',
+    region: raw.region_code || '',
+    isp: raw.isp || 'Unknown',
+    org: raw.org || 'Unknown',
+    asn: raw.asn || '',
+    cloudProvider, hasSsl,
+    lastSeen: raw.last_update || new Date().toISOString(),
+    tags: raw.tags || [],
+    ports: portObjs, cves, services, threatFeeds,
+    riskScore: risk,
+    openPorts: portObjs.length,
+    critPorts: portObjs.filter(p=>p.risk==='critical').length,
+    highPorts: portObjs.filter(p=>p.risk==='high').length,
+    critCves: cves.filter(c=>c.cvss>=9).length,
+    highCves: cves.filter(c=>c.cvss>=7&&c.cvss<9).length,
+    noAuthCount: noAuthServices.length
+  };
+}
+
+function detectNoAuth(svc){
+  const b = (svc.data||'').toLowerCase();
+  const noAuthPatterns = ['no authentication','no auth','requirepass (empty','without auth','auth disabled','anonymous access','unauthorized'];
+  return noAuthPatterns.some(p=>b.includes(p)) ||
+    ([9200,27017,6379,11211,5984].includes(svc.port) && !b.includes('authentication required') && !b.includes('401') && !b.includes('requirepass'));
+}
+
+function buildServiceTags(svc, noAuth){
+  const tags = [];
+  if(svc.ssl) tags.push('TLS');
+  if(noAuth) tags.push('NO-AUTH');
+  if([3306,5432,27017,6379,9200,1433,11211,5984,28015].includes(svc.port)) tags.push('DATABASE');
+  if(svc.port===3389) tags.push('RDP');
+  if(svc.port===2375||svc.port===2376) tags.push('DOCKER');
+  if([6443,10250,10255,2379,2380].includes(svc.port)) tags.push('KUBERNETES');
+  if(svc.tags) tags.push(...svc.tags.filter(t=>!tags.includes(t)));
+  return tags;
+}
+
+function buildThreatFeeds(ports, cves, services){
+  const feeds = [];
+  const noAuthSvcs = services.filter(s=>s.noAuth);
+  if(cves.length>0) feeds.push({src:'Shodan CVE Correlation', count:cves.length, note:'CVEs matched via banner analysis'});
+  if(noAuthSvcs.length>0) feeds.push({src:'Unauthenticated Services', count:noAuthSvcs.length, note:'Services with no auth detected'});
+  const critP = ports.filter(p=>p.risk==='critical');
+  if(critP.length>0) feeds.push({src:'Critical Port Exposure', count:critP.length, note:'Ports with known exploit vectors'});
+  const highP = ports.filter(p=>p.risk==='high');
+  if(highP.length>0) feeds.push({src:'High-Risk Port Exposure', count:highP.length, note:'Ports commonly targeted in attacks'});
+  if(services.some(s=>s.tags.includes('DATABASE'))) feeds.push({src:'Exposed Database Ports', count:services.filter(s=>s.tags.includes('DATABASE')).length, note:'Database services directly exposed'});
+  if(services.some(s=>s.tags.includes('KUBERNETES')||s.tags.includes('DOCKER'))) feeds.push({src:'Container Orchestration Exposure', count:1, note:'K8s/Docker APIs may be accessible'});
+  return feeds;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DEMO DATA
+═══════════════════════════════════════════════════════════ */
+function loadDemo(){
+  logs = [];
+  log('Demo mode — simulated scan for 198.51.100.42 (demo-cloud.example.com)', 'info');
+  log('Resolved: 198.51.100.42 → demo-cloud.example.com', 'ok');
+  log('Shodan query simulated — returned 9 services', 'ok');
+  log('Port 23 (Telnet) OPEN — CRITICAL', 'err');
+  log('Port 3389 (RDP) OPEN — CRITICAL', 'err');
+  log('Port 9200 (Elasticsearch) OPEN — no authentication detected!', 'err');
+  log('Port 27017 (MongoDB) OPEN — no authentication! Databases exposed: users, orders, payments', 'err');
+  log('Port 6379 (Redis) OPEN — no requirepass set', 'warn');
+  log('CVE-2014-2005 (CVSS 9.8) — Elasticsearch RCE via dynamic scripting', 'err');
+  log('CVE-2019-2389 (CVSS 8.1) — MongoDB unauthorized ops', 'warn');
+  log('CVE-2018-15473 (CVSS 5.3) — OpenSSH user enumeration', 'warn');
+  log('CVE-2015-8080 (CVSS 7.5) — Redis/glibc stack overflow', 'warn');
+  log('Risk score: 88/100 — CRITICAL', 'err');
+  log('Generating 14 remediation recommendations...', 'info');
+  log('Scan complete.', 'ok');
+
+  scanData = {
+    target:'demo-cloud.example.com', ip:'198.51.100.42',
+    hostnames:['demo-cloud.example.com','api.demo-cloud.example.com'],
+    country:'United States', city:'San Francisco', region:'CA',
+    isp:'Cloudflare Inc', org:'Cloudflare Inc',
+    asn:'AS13335', cloudProvider:'Cloudflare', hasSsl:true,
+    lastSeen:new Date().toISOString(),
+    tags:['cloud','self-signed','database'],
+    openPorts:9, critPorts:4, highPorts:2,
+    critCves:1, highCves:2, noAuthCount:3,
+    riskScore:88,
+    ports:[
+      {port:22,service:'SSH',risk:'high'},
+      {port:23,service:'Telnet',risk:'critical'},
+      {port:80,service:'HTTP',risk:'open'},
+      {port:443,service:'HTTPS',risk:'open'},
+      {port:3389,service:'RDP',risk:'critical'},
+      {port:6379,service:'Redis',risk:'high'},
+      {port:8080,service:'HTTP-Alt',risk:'open'},
+      {port:9200,service:'Elasticsearch',risk:'critical'},
+      {port:27017,service:'MongoDB',risk:'critical'}
+    ],
+    cves:[
+      {id:'CVE-2014-2005',port:9200,service:'Elasticsearch 1.4.2',cvss:9.8,
+       summary:'Elasticsearch before 1.6.1 allows remote code execution via Groovy dynamic scripting. The default installation exposes the scripting engine with no authentication, letting attackers run arbitrary OS commands.',
+       references:['https://nvd.nist.gov/vuln/detail/CVE-2014-2005','https://www.elastic.co/community/security']},
+      {id:'CVE-2019-2389',port:27017,service:'MongoDB 3.6.8',cvss:8.1,
+       summary:'Incorrect scoping of kill operations in MongoDB Server before 4.0.3 allows a user to kill operations they do not own, particularly dangerous when authorization is disabled and the database is publicly accessible.',
+       references:['https://nvd.nist.gov/vuln/detail/CVE-2019-2389']},
+      {id:'CVE-2015-8080',port:6379,service:'Redis 2.8.4',cvss:7.5,
+       summary:'Stack-based buffer overflow in getaddrinfo in glibc through 2.22 allows context-dependent attackers to cause denial of service (crash) or execute arbitrary code via a crafted DNS response.',
+       references:['https://nvd.nist.gov/vuln/detail/CVE-2015-8080']},
+      {id:'CVE-2018-15473',port:22,service:'OpenSSH 7.4',cvss:5.3,
+       summary:'OpenSSH through 7.7 is prone to a user enumeration vulnerability due to not delaying bailout for an invalid authenticating user until after the packet containing the request has been fully parsed, related to auth2-gss.c, auth2-hostbased.c, and auth2-pubkey.c.',
+       references:['https://nvd.nist.gov/vuln/detail/CVE-2018-15473','https://www.openssh.com/security.html']}
+    ],
+    services:[
+      {port:22,transport:'tcp',name:'OpenSSH',version:'7.4',cpe:'cpe:/a:openbsd:openssh:7.4',
+       banner:'SSH-2.0-OpenSSH_7.4\nProtocol: 2.0\nKey exchange: curve25519-sha256\nAuth methods: publickey, password',
+       ssl:false,noAuth:false,tags:[]},
+      {port:23,transport:'tcp',name:'Telnet',version:'',cpe:'',
+       banner:'Linux 3.x telnetd\nHost: demo-cloud.example.com\nLogin: (prompt — credentials transmitted in PLAINTEXT)',
+       ssl:false,noAuth:true,tags:['PLAINTEXT']},
+      {port:80,transport:'tcp',name:'nginx',version:'1.18.0',cpe:'cpe:/a:nginx:nginx:1.18.0',
+       banner:'HTTP/1.1 301 Moved Permanently\nServer: nginx/1.18.0\nLocation: https://demo-cloud.example.com/',
+       ssl:false,noAuth:false,tags:[]},
+      {port:443,transport:'tcp',name:'nginx',version:'1.18.0',cpe:'cpe:/a:nginx:nginx:1.18.0',
+       banner:'HTTP/1.1 200 OK\nServer: nginx/1.18.0\nStrict-Transport-Security: max-age=31536000\nX-Content-Type-Options: nosniff',
+       ssl:true,noAuth:false,tags:[]},
+      {port:3389,transport:'tcp',name:'Remote Desktop Protocol',version:'',cpe:'',
+       banner:'RDP endpoint active\nWindows Server 2016\nEncryption: RC4 (legacy — not recommended)\nNLA: Disabled',
+       ssl:false,noAuth:false,tags:['RDP']},
+      {port:6379,transport:'tcp',name:'Redis',version:'2.8.4',cpe:'cpe:/a:redis:redis:2.8.4',
+       banner:'+PONG\r\n# Server\r\nredis_version:2.8.4\r\nbind-source-addr: 0.0.0.0\r\nrequirepass: (empty)\r\n# WARNING: no requirepass configured',
+       ssl:false,noAuth:true,tags:['DATABASE']},
+      {port:8080,transport:'tcp',name:'Apache Tomcat',version:'9.0.1',cpe:'cpe:/a:apache:tomcat:9.0.1',
+       banner:'HTTP/1.1 200 OK\nServer: Apache-Coyote/1.1\nX-Powered-By: Servlet/3.1',
+       ssl:false,noAuth:false,tags:[]},
+      {port:9200,transport:'tcp',name:'Elasticsearch',version:'1.4.2',cpe:'cpe:/a:elastic:elasticsearch:1.4.2',
+       banner:'{"status":200,"name":"demo-node","version":{"number":"1.4.2","build_snapshot":false},"tagline":"You Know, for Search"}\n*** NO AUTHENTICATION REQUIRED ***\nIndices: users, products, orders, logs, sessions',
+       ssl:false,noAuth:true,tags:['DATABASE','NO-AUTH']},
+      {port:27017,transport:'tcp',name:'MongoDB',version:'3.6.8',cpe:'cpe:/a:mongodb:mongodb:3.6.8',
+       banner:'MongoDB 3.6.8\nismaster: true\n*** UNAUTHENTICATED ACCESS ***\nDatabases: users (4.2GB), orders (1.8GB), payments (890MB), sessions (220MB)',
+       ssl:false,noAuth:true,tags:['DATABASE','NO-AUTH']}
+    ],
+    threatFeeds:[
+      {src:'Shodan CVE Correlation',count:4,note:'CVEs matched via banner analysis'},
+      {src:'Unauthenticated Services',count:3,note:'Elasticsearch, MongoDB, Redis — open access'},
+      {src:'Critical Port Exposure',count:4,note:'Telnet, RDP, Elasticsearch, MongoDB'},
+      {src:'High-Risk Port Exposure',count:2,note:'SSH 7.4, Redis 2.8'},
+      {src:'Exposed Database Ports',count:3,note:'Elasticsearch, MongoDB, Redis all publicly reachable'},
+      {src:'Container Orchestration Exposure',count:0,note:'No K8s/Docker APIs detected'}
+    ].filter(f=>f.count>0)
+  };
+
+  setStatus('ok','Demo scan complete — 9 ports | 4 CVEs | Risk: 88/100 CRITICAL');
+  setProgress(100);
+  renderResults();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER RESULTS
+═══════════════════════════════════════════════════════════ */
+function renderScanning(target){
+  document.getElementById('mainContent').innerHTML = `
+    <div class="empty-state">
+      <div style="font-size:48px;animation:blink 1s ease-in-out infinite">⬡</div>
+      <div class="empty-headline" style="color:var(--accent)">SCANNING ${target.toUpperCase()}</div>
+      <div class="empty-sub">Querying Shodan API — correlating CVEs — analyzing services...</div>
+    </div>`;
+}
+
+function renderError(msg){
+  document.getElementById('mainContent').innerHTML = `
+    <div class="error-panel">
+      <div class="error-title">⚠ Scan Error</div>
+      <div class="error-msg">${escHtml(msg)}</div>
+      <div class="error-help">
+        Common causes:<br>
+        • <strong>Invalid API key</strong> — get a free key at <a href="https://account.shodan.io/register" target="_blank">shodan.io ↗</a><br>
+        • <strong>Free plan restriction</strong> — free Shodan accounts have query limits. Try well-known IPs like <code>8.8.8.8</code> or click <strong>DEMO</strong>.<br>
+        • <strong>No data</strong> — Shodan may not have indexed this host. Try another target.<br>
+        • <strong>CORS error</strong> — if running locally, use a CORS proxy or the Shodan CLI.<br>
+        • <strong>Rate limit</strong> — wait a moment and try again.
+      </div>
+    </div>`;
+}
+
+function renderResults(){
+  document.getElementById('exportBtn').style.display = 'inline-block';
+  document.getElementById('clearBtn').style.display = 'inline-block';
+
+  const d = scanData;
+  const tabs = `
+    <div class="tabs" id="tabBar">
+      <div class="tab active" onclick="switchTab(this,'overview')">Overview</div>
+      <div class="tab" onclick="switchTab(this,'vulns')">Vulnerabilities <span class="tab-count ${d.cves.length?'red':''}">${d.cves.length}</span></div>
+      <div class="tab" onclick="switchTab(this,'services')">Services <span class="tab-count">${d.services.length}</span></div>
+      <div class="tab" onclick="switchTab(this,'intel')">Threat Intel</div>
+      <div class="tab" onclick="switchTab(this,'recs')">Remediation</div>
+      <div class="tab" onclick="switchTab(this,'log')">Scan Log</div>
+    </div>`;
+
+  document.getElementById('mainContent').innerHTML = tabs + '<div id="tabContent"></div>';
+  switchTab(null, 'overview');
+}
+
+function switchTab(el, tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  else { const t = document.querySelector(`.tab[onclick*="'${tab}'"]`); if(t) t.classList.add('active'); }
+  currentTab = tab;
+  const tc = document.getElementById('tabContent');
+  if(tab==='overview') tc.innerHTML = buildOverview();
+  if(tab==='vulns') tc.innerHTML = buildVulns();
+  if(tab==='services') tc.innerHTML = buildServices();
+  if(tab==='intel') tc.innerHTML = buildIntel();
+  if(tab==='recs') tc.innerHTML = buildRecs();
+  if(tab==='log') tc.innerHTML = renderLog();
+}
+
+/* ─── OVERVIEW ─── */
+function buildOverview(){
+  const d = scanData;
+  const rc = getRiskColor(d.riskScore);
+  const rl = getRiskLabel(d.riskScore);
+  const circ = 2*Math.PI*36;
+  const da = `${(d.riskScore/100)*circ} ${circ}`;
+  const flag = COUNTRY_FLAGS[d.country]||'🌐';
+  const lastSeen = new Date(d.lastSeen).toLocaleString();
+  const sslBadge = d.hasSsl?'<span class="badge b-tls">TLS</span>':'<span class="badge b-notls">No TLS</span>';
+  const cpBadge = d.cloudProvider?`<span class="badge b-cloud">${d.cloudProvider}</span>`:'';
+  const hnList = d.hostnames.length ? d.hostnames.slice(0,3).join('<br>') : '—';
+
+  const portHtml = d.ports.map(p=>`
+    <div class="port-pill">
+      <span class="pp-num">${p.port}</span>
+      <span class="pp-svc">${p.service}</span>
+      <span class="pp-dot ${p.risk==='critical'?'dot-crit':p.risk==='high'?'dot-high':'dot-open'}"></span>
+    </div>`).join('');
+
+  const topCves = d.cves.slice(0,3).map(c=>buildVulnCard(c)).join('');
+  const riskActionCls = d.riskScore>=80?'ra-crit':d.riskScore>=60?'ra-high':d.riskScore>=40?'ra-med':'ra-low';
+  const riskActionTxt = d.riskScore>=80?'⚠ Critical — Immediate action required':d.riskScore>=60?'⚠ High — Action required within 24h':d.riskScore>=40?'↑ Medium — Schedule patching':'✓ Low — Monitor regularly';
+
+  return `
+  <div class="stats-grid" style="margin-top:16px">
+    <div class="stat-box sb-cyan"><div class="stat-num n-cyan">${d.openPorts}</div><div class="stat-label">Open Ports</div></div>
+    <div class="stat-box sb-red"><div class="stat-num n-red">${d.critPorts}</div><div class="stat-label">Critical Ports</div></div>
+    <div class="stat-box sb-red"><div class="stat-num n-red">${d.critCves}</div><div class="stat-label">Critical CVEs</div></div>
+    <div class="stat-box sb-amber"><div class="stat-num n-amber">${d.highCves}</div><div class="stat-label">High CVEs</div></div>
+    <div class="stat-box sb-purple"><div class="stat-num n-purple">${d.noAuthCount}</div><div class="stat-label">No-Auth Services</div></div>
+    <div class="stat-box sb-amber"><div class="stat-num n-amber">${d.cves.length}</div><div class="stat-label">Total CVEs</div></div>
+  </div>
+
+  <div class="risk-box">
+    <div class="ring-wrap">
+      <svg width="88" height="88" viewBox="0 0 88 88">
+        <circle cx="44" cy="44" r="36" fill="none" stroke="var(--border)" stroke-width="9"/>
+        <circle cx="44" cy="44" r="36" fill="none" stroke="${rc}" stroke-width="9"
+          stroke-linecap="round" stroke-dasharray="${da}"
+          style="transition:stroke-dasharray .9s .1s"/>
+      </svg>
+      <div class="ring-center">
+        <span class="ring-num" style="color:${rc}">${d.riskScore}</span>
+        <span class="ring-lbl">RISK</span>
+      </div>
+    </div>
+    <div class="risk-info">
+      <div class="risk-grade" style="color:${rc}">${rl}</div>
+      <div class="risk-desc">
+        ${d.cves.length} CVE(s) found across ${d.openPorts} open ports.<br>
+        ${d.critPorts} critical port(s) — ${d.noAuthCount} service(s) with no authentication.
+      </div>
+      <div class="risk-action ${riskActionCls}">${riskActionTxt}</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-title">// Host Information</div>
+        <div class="info-row"><span class="ik">IP</span><span class="iv">${d.ip}</span></div>
+        <div class="info-row"><span class="ik">Hostname(s)</span><span class="iv">${hnList}</span></div>
+        <div class="info-row"><span class="ik">Location</span><span class="iv">${flag} ${d.city}${d.region?', '+d.region:''}, ${d.country}</span></div>
+        <div class="info-row"><span class="ik">ISP</span><span class="iv">${d.isp}</span></div>
+        <div class="info-row"><span class="ik">Org</span><span class="iv">${d.org}</span></div>
+        <div class="info-row"><span class="ik">ASN</span><span class="iv">${d.asn||'—'}</span></div>
+        <div class="info-row"><span class="ik">Cloud</span><span class="iv">${d.cloudProvider||'Unknown'}</span></div>
+        <div class="info-row"><span class="ik">Last Seen</span><span class="iv">${lastSeen}</span></div>
+        <div class="info-row"><span class="ik">Tags</span><span class="iv">${sslBadge} ${cpBadge} ${(d.tags||[]).map(t=>`<span class="badge b-tag">${t}</span>`).join('')}</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">// Open Ports (${d.ports.length})</div>
+        <div class="port-scroll">${portHtml}</div>
+        <div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted)">
+          <span style="color:var(--red)">■</span> Critical &nbsp;
+          <span style="color:var(--amber)">■</span> High &nbsp;
+          <span style="color:var(--green)">■</span> Open
+        </div>
+      </div>
+    </div>
+
+    <div>
+      ${d.cves.length > 0
+        ? `<div style="margin-bottom:10px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase">// Top Vulnerabilities</div>
+           <div class="vuln-list">${topCves}</div>`
+        : `<div class="panel" style="text-align:center;padding:40px">
+             <div style="font-size:32px;opacity:.2">✓</div>
+             <div style="color:var(--muted);font-family:var(--mono);font-size:12px;margin-top:12px">No CVEs detected in Shodan data for this target.</div>
+           </div>`
+      }
+    </div>
+  </div>`;
+}
+
+/* ─── VULNS ─── */
+function buildVulns(){
+  const d = scanData;
+  if(!d.cves.length) return `<div class="empty-state" style="margin-top:20px"><div class="empty-hex">✓</div><div class="empty-headline">No CVEs Detected</div><div class="empty-sub">Shodan found no CVEs in the service banners of this host. This does not mean the host is fully secure — only that no matched CVEs were present in the indexed data.</div></div>`;
+  return `<div style="margin-top:16px"><div class="vuln-list">${d.cves.map(c=>buildVulnCard(c)).join('')}</div></div>`;
+}
+
+function buildVulnCard(c){
+  const cvss = parseFloat(c.cvss)||0;
+  const isCrit = cvss>=9, isHigh = cvss>=7, isMed = cvss>=4;
+  const cls = isCrit?'crit':isHigh?'high':isMed?'med':'low';
+  const scoreCls = isCrit?'vs-crit':isHigh?'vs-high':isMed?'vs-med':'vs-low';
+  const barPct = Math.round((cvss/10)*100);
+  const barCls = isCrit?'vbf-red':isHigh?'vbf-amber':'vbf-cyan';
+  const icon = isCrit?'🔴':isHigh?'🟠':isMed?'🟡':'🔵';
+  const refs = c.references && c.references.length
+    ? `<div class="vref">References: ${c.references.slice(0,2).map(r=>`<a href="${r}" target="_blank">${r.replace('https://','').substr(0,50)}...</a>`).join(' | ')}</div>`
+    : '';
+  return `
+    <div class="vuln-card vc-${cls}">
+      <div class="vh">
+        <div class="vi vi-${cls}">${icon}</div>
+        <div class="vm">
+          <div class="vt">${escHtml(c.service)}</div>
+          <div class="vmeta">
+            <span class="vcve">${c.id}</span>
+            <span class="vscore ${scoreCls}">CVSS ${cvss.toFixed(1)}</span>
+            <span class="vport">port ${c.port}</span>
+          </div>
+        </div>
+      </div>
+      <div class="vdesc">${escHtml(c.summary)}</div>
+      <div class="vbar-wrap"><div class="vbar-fill ${barCls}" style="width:${barPct}%"></div></div>
+      <div class="vbar-labels"><span>CVSS Score</span><span>${cvss.toFixed(1)} / 10.0</span></div>
+      ${refs}
+    </div>`;
+}
+
+/* ─── SERVICES ─── */
+function buildServices(){
+  const d = scanData;
+  if(!d.services.length) return `<div class="empty-state" style="margin-top:20px"><div class="empty-hex">—</div><div class="empty-headline">No Service Banners</div><div class="empty-sub">No detailed service information was returned by Shodan for this host.</div></div>`;
+  const cards = d.services.map(s=>{
+    const tagHtml = s.tags.map(t=>{
+      const tc = t==='TLS'?'stag-tls':t==='NO-AUTH'?'stag-noauth':t==='DATABASE'||t==='DOCKER'||t==='KUBERNETES'?'stag-db':t==='RDP'?'stag-rdp':'stag-generic';
+      return `<span class="stag ${tc}">${t}</span>`;
+    }).join('');
+    return `
+      <div class="svc-card">
+        <div class="sc-head">
+          <span class="sc-port">${s.port}/${s.transport}</span>
+          <span class="sc-name">${escHtml(s.name)}</span>
+        </div>
+        ${s.version?`<div class="sc-ver">Version: ${escHtml(s.version)}</div>`:''}
+        ${s.cpe?`<div class="sc-cpe">${escHtml(s.cpe.substr(0,60))}</div>`:''}
+        ${s.tags.length?`<div class="sc-tags">${tagHtml}</div>`:''}
+        ${s.banner?`<div class="sc-banner">${escHtml(s.banner.substr(0,350))}</div>`:''}
+      </div>`;
+  }).join('');
+  return `<div style="margin-top:16px"><div class="svc-grid">${cards}</div></div>`;
+}
+
+/* ─── INTEL ─── */
+function buildIntel(){
+  const d = scanData;
+  const maxF = Math.max(...d.threatFeeds.map(f=>f.count),1);
+  const feedRows = d.threatFeeds.map(f=>`
+    <div class="threat-feed-row">
+      <span class="tfsrc">${f.src}</span>
+      <div class="tfbar-wrap"><div class="tfbar-fill" style="width:${Math.round((f.count/maxF)*100)}%"></div></div>
+      <span class="tfcount">${f.count}</span>
+    </div>`).join('');
+
+  const flag = COUNTRY_FLAGS[d.country]||'🌐';
+  const exposedDbs = d.services.filter(s=>s.tags.includes('DATABASE'));
+
+  return `
+  <div style="margin-top:16px">
+    <div class="intel-grid">
+      <div class="panel">
+        <div class="panel-title">// Attack Surface Metrics</div>
+        ${feedRows || '<div style="color:var(--muted);font-size:12px">No threat intelligence data.</div>'}
+        <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.6">
+          Derived from port exposure analysis, Shodan CVE feeds, and service banner heuristics.
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">// Geolocation Intelligence</div>
+        <div class="info-row"><span class="ik">IP</span><span class="iv">${d.ip}</span></div>
+        <div class="info-row"><span class="ik">Country</span><span class="iv">${flag} ${d.country}</span></div>
+        <div class="info-row"><span class="ik">City/Region</span><span class="iv">${d.city}${d.region?', '+d.region:''}</span></div>
+        <div class="info-row"><span class="ik">ISP</span><span class="iv">${d.isp}</span></div>
+        <div class="info-row"><span class="ik">Organisation</span><span class="iv">${d.org}</span></div>
+        <div class="info-row"><span class="ik">ASN</span><span class="iv">${d.asn||'—'}</span></div>
+        <div class="info-row"><span class="ik">Cloud</span><span class="iv">${d.cloudProvider||'Unknown/On-prem'}</span></div>
+      </div>
+    </div>
+
+    ${exposedDbs.length ? `
+    <div class="panel" style="margin-top:14px">
+      <div class="panel-title">// Exposed Database Intelligence</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:4px">
+        ${exposedDbs.map(db=>`
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px">${escHtml(db.name)} ${escHtml(db.version)}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--accent)">port ${db.port}</div>
+            ${db.noAuth?'<div style="font-family:var(--mono);font-size:10px;color:var(--red);margin-top:4px">⚠ NO AUTHENTICATION</div>':''}
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <div class="panel" style="margin-top:14px">
+      <div class="panel-title">// High-Risk Port Analysis</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+        ${d.ports.filter(p=>p.risk!=='open').map(p=>`
+          <div class="rec-item" style="border-color:${p.risk==='critical'?'#ef444433':'#f59e0b33'}">
+            <span class="rec-pri ${p.risk==='critical'?'rp-crit':'rp-high'}">${p.risk.toUpperCase()}</span>
+            <div class="rec-text">
+              <strong style="color:var(--accent)">Port ${p.port}</strong> (${p.service}) — 
+              ${getPortThreatDesc(p.port)}
+            </div>
+          </div>`).join('') || '<div style="color:var(--muted);font-size:12px">No high-risk ports detected.</div>'}
+      </div>
+    </div>
+  </div>`;
+}
+
+function getPortThreatDesc(port){
+  const m = {
+    21:'FTP transmits credentials in plaintext. Commonly exploited for anonymous access.',
+    22:'SSH brute-force target. Outdated versions may have known CVEs.',
+    23:'Telnet transmits ALL data including passwords in plaintext. Should never be exposed.',
+    135:'MS-RPC endpoint mapper. Exploited heavily in Windows environments.',
+    139:'NetBIOS Session Service. Legacy Windows file sharing with multiple known exploits.',
+    445:'SMB — targeted by EternalBlue/WannaCry and related exploits.',
+    1433:'MS-SQL Server. Brute-force and RCE target.',
+    2375:'Docker daemon TCP — no TLS. Full container takeover possible.',
+    3389:'RDP — BlueKeep (CVE-2019-0708) and many others. Brute-force target.',
+    5900:'VNC — often poorly authenticated. Screen takeover vector.',
+    6379:'Redis with no auth — full data read/write. Can be abused for RCE via config write.',
+    9200:'Elasticsearch — public access means full index read/write/delete with no auth.',
+    10250:'Kubelet API — can exec into containers and read secrets.',
+    11211:'Memcached — amplification DDoS vector. Data exposure.',
+    27017:'MongoDB — default install has no auth. Full DB access.',
+    50070:'Hadoop NameNode — exposes file system structure and data.',
+  };
+  return m[port] || 'Publicly accessible — review firewall rules and access controls.';
+}
+
+/* ─── RECOMMENDATIONS ─── */
+function buildRecs(){
+  const d = scanData;
+  const recs = [];
+
+  // Critical CVEs
+  if(d.critCves>0) recs.push({p:'crit', t:`${d.critCves} critical CVE(s) detected (CVSS ≥9.0). Apply vendor patches <strong>immediately</strong>. Review each CVE in the Vulnerabilities tab for specific remediation steps.`});
+  if(d.highCves>0) recs.push({p:'high', t:`${d.highCves} high-severity CVE(s) detected (CVSS 7–8.9). Schedule patching within <strong>48–72 hours</strong> for production systems.`});
+
+  // Specific port recommendations
+  if(d.ports.some(p=>p.port===23)) recs.push({p:'crit', t:`<strong>Telnet (port 23)</strong> is open. Disable it immediately: <code>sudo systemctl disable telnet</code>. Replace with SSH.`});
+  if(d.ports.some(p=>p.port===3389)) recs.push({p:'crit', t:`<strong>RDP (port 3389)</strong> is internet-exposed. Restrict with firewall: <code>ufw deny 3389/tcp</code>. Place behind VPN. Enable NLA and account lockout.`});
+  if(d.ports.some(p=>p.port===9200||p.port===9300)) recs.push({p:'crit', t:`<strong>Elasticsearch</strong> is publicly accessible. Enable X-Pack security: set <code>xpack.security.enabled: true</code> in elasticsearch.yml. Bind to localhost only.`});
+  if(d.ports.some(p=>p.port===27017||p.port===27018)) recs.push({p:'crit', t:`<strong>MongoDB</strong> is exposed without authentication. Enable: <code>mongod --auth</code> or add <code>security.authorization: enabled</code> to mongod.conf. Restrict to 127.0.0.1.`});
+  if(d.ports.some(p=>p.port===6379)) recs.push({p:'high', t:`<strong>Redis</strong> requires a password. Set <code>requirepass YourStrongPassword</code> in redis.conf and <code>bind 127.0.0.1</code> to restrict network access.`});
+  if(d.ports.some(p=>p.port===2375)) recs.push({p:'crit', t:`<strong>Docker daemon TCP</strong> (port 2375) is exposed without TLS — full container escape risk. Disable with <code>DOCKER_HOST=unix:///var/run/docker.sock</code> and remove -H tcp://0.0.0.0:2375.`});
+  if(d.ports.some(p=>p.port===11211)) recs.push({p:'crit', t:`<strong>Memcached</strong> is publicly accessible and enables DDoS amplification. Bind to localhost: <code>-l 127.0.0.1</code> in memcached.conf.`});
+  if(d.ports.some(p=>p.port===5900)) recs.push({p:'high', t:`<strong>VNC (port 5900)</strong> is exposed. Set a strong password and restrict to specific IPs. Consider tunneling over SSH.`});
+  if(d.ports.some(p=>p.port===21)) recs.push({p:'high', t:`<strong>FTP (port 21)</strong> transmits credentials in plaintext. Migrate to <strong>SFTP</strong> (SSH-based) or FTPS. Disable FTP: <code>sudo systemctl disable vsftpd</code>.`});
+  if(d.ports.some(p=>p.port===10250||p.port===10255)) recs.push({p:'crit', t:`<strong>Kubernetes Kubelet API</strong> is exposed. Restrict access: ensure <code>--anonymous-auth=false</code> and bind to internal network only.`});
+
+  // SSL
+  if(!d.hasSsl) recs.push({p:'high', t:`<strong>No TLS/SSL detected.</strong> All traffic is unencrypted. Deploy a certificate (free via Let's Encrypt: <code>certbot --nginx</code>). Force HTTPS redirects.`});
+
+  // No-auth
+  if(d.noAuthCount>0) recs.push({p:'crit', t:`<strong>${d.noAuthCount} service(s) have no authentication.</strong> Any internet user can read, write, or delete data. Enable authentication on every exposed service before anything else.`});
+
+  // Port hardening
+  if(d.openPorts>10) recs.push({p:'high', t:`<strong>${d.openPorts} ports</strong> are publicly open. Audit and close every unused port. Use iptables/ufw and apply principle of least exposure.`});
+
+  // General
+  recs.push({p:'med', t:`Deploy an <strong>Intrusion Detection System</strong>: fail2ban for SSH/RDP brute-force, AWS GuardDuty or similar for cloud workloads.`});
+  recs.push({p:'med', t:`Enable <strong>rate limiting and geo-blocking</strong> on administrative interfaces. Only allow known IP ranges to access management ports.`});
+  recs.push({p:'med', t:`Implement a <strong>Web Application Firewall</strong> (WAF) in front of all HTTP/HTTPS services. Consider Cloudflare, AWS WAF, or ModSecurity.`});
+  recs.push({p:'med', t:`Schedule <strong>regular automated scans</strong> using Shodan Monitor, Nessus, or OpenVAS to catch new exposures before attackers do.`});
+  recs.push({p:'info', t:`Enable <strong>centralized logging and alerting</strong> (ELK Stack, Splunk, or Datadog) for all exposed services to detect unauthorized access attempts.`});
+  recs.push({p:'info', t:`Apply <strong>network segmentation</strong>: databases and internal services should never be in the same network segment as public-facing services.`});
+
+  return `
+  <div style="margin-top:16px">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1.5px;margin-bottom:12px;padding:8px 12px;background:var(--surface);border-radius:6px;border:1px solid var(--border)">
+      ${recs.length} recommendations generated based on scan results — sorted by priority
+    </div>
+    <div class="rec-list">
+      ${recs.map((r,i)=>`
+        <div class="rec-item">
+          <span class="rec-pri rp-${r.p}">${r.p.toUpperCase()}</span>
+          <div class="rec-text">${r.t}</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ─── LOG ─── */
+function renderLog(){
+  if(!logs.length) return `<div class="empty-state" style="margin-top:20px"><div class="empty-hex">—</div><div class="empty-headline">No Logs</div></div>`;
+  const lines = logs.map(l=>`<div><span class="log-ts">[${l.ts}]</span> <span class="log-${l.type}">${escHtml(l.msg)}</span></div>`).join('');
+  return `<div style="margin-top:16px"><div class="log-panel" id="logPanel">${lines}</div></div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CLEAR
+═══════════════════════════════════════════════════════════ */
+function clearResults(){
+  scanData = null; logs = [];
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('clearBtn').style.display = 'none';
+  document.getElementById('exportPanel').style.display = 'none';
+  setStatus('idle','Ready — enter a target and API key, or try Demo Mode');
+  setProgress(0);
+  document.getElementById('progWrap').style.display = 'none';
+  document.getElementById('mainContent').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-hex">⬡</div>
+      <div class="empty-headline">NO TARGET SCANNED</div>
+      <div class="empty-sub">Enter an IP address or hostname above with your Shodan API key and click Scan.<br>Or click <span style="color:var(--purple)">DEMO</span> to see a full simulated scan result.</div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════════════════════════ */
+function toggleExport(){
+  const p = document.getElementById('exportPanel');
+  p.style.display = p.style.display==='block' ? 'none' : 'block';
+}
+
+function download(filename, content, type='text/plain'){
+  const blob = new Blob([content], {type});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportJSON(){
+  if(!scanData) return;
+  download(`cloudsec_scan_${scanData.ip}_${Date.now()}.json`, JSON.stringify(scanData, null, 2), 'application/json');
+}
+
+function exportCSV(){
+  if(!scanData) return;
+  const rows = [['port','service','risk_level']];
+  scanData.ports.forEach(p => rows.push([p.port, p.service, p.risk]));
+  download(`ports_${scanData.ip}_${Date.now()}.csv`, rows.map(r=>r.join(',')).join('\n'), 'text/csv');
+}
+
+function exportCVEcsv(){
+  if(!scanData) return;
+  const rows = [['cve_id','port','service','cvss_score','summary']];
+  scanData.cves.forEach(c => rows.push([c.id, c.port, `"${c.service}"`, c.cvss, `"${(c.summary||'').replace(/"/g,"'")}"`]));
+  download(`cves_${scanData.ip}_${Date.now()}.csv`, rows.map(r=>r.join(',')).join('\n'), 'text/csv');
+}
+
+function exportHTML(){
+  if(!scanData) return;
+  const d = scanData;
+  const ts = new Date().toUTCString();
+  const cveRows = d.cves.map(c=>`<tr><td>${c.id}</td><td>${c.port}</td><td>${escHtml(c.service)}</td><td>${c.cvss.toFixed(1)}</td><td>${escHtml(c.summary.substr(0,120))}</td></tr>`).join('');
+  const portRows = d.ports.map(p=>`<tr><td>${p.port}</td><td>${p.service}</td><td>${p.risk}</td></tr>`).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>CloudSec Report — ${d.ip}</title>
+<style>body{font-family:monospace;background:#07090f;color:#e2e8f0;padding:40px;max-width:1000px;margin:0 auto}
+h1{color:#00e5ff;letter-spacing:3px}h2{color:#a78bfa;margin-top:32px}
+table{border-collapse:collapse;width:100%;margin-top:12px}
+th{background:#1a2236;color:#64748b;padding:8px 12px;text-align:left;font-size:12px}
+td{padding:8px 12px;border-bottom:1px solid #1e2d4a;font-size:12px}
+.crit{color:#ef4444}.high{color:#f59e0b}.ok{color:#10b981}
+.stat{display:inline-block;background:#111827;border:1px solid #1e2d4a;padding:12px 20px;border-radius:8px;margin:6px;text-align:center}
+.sn{font-size:28px;font-weight:700}.sl{font-size:10px;color:#64748b}
+</style></head><body>
+<h1>⬡ CLOUDSEC SCANNER REPORT</h1>
+<p style="color:#64748b">Generated: ${ts}</p>
+<p style="color:#64748b">Target: <span style="color:#00e5ff">${d.target}</span> (${d.ip}) — ${d.city}, ${d.country}</p>
+<p style="color:#64748b">Risk Score: <span style="color:${getRiskColor(d.riskScore)}">${d.riskScore}/100 — ${getRiskLabel(d.riskScore)}</span></p>
+<div style="margin:20px 0">
+<div class="stat"><div class="sn" style="color:#00e5ff">${d.openPorts}</div><div class="sl">OPEN PORTS</div></div>
+<div class="stat"><div class="sn" style="color:#ef4444">${d.critPorts}</div><div class="sl">CRITICAL PORTS</div></div>
+<div class="stat"><div class="sn" style="color:#ef4444">${d.cves.length}</div><div class="sl">TOTAL CVES</div></div>
+<div class="stat"><div class="sn" style="color:#f59e0b">${d.noAuthCount}</div><div class="sl">NO-AUTH SERVICES</div></div>
+</div>
+<h2>Open Ports</h2>
+<table><tr><th>Port</th><th>Service</th><th>Risk</th></tr>${portRows}</table>
+<h2>Vulnerabilities (CVEs)</h2>
+${d.cves.length ? `<table><tr><th>CVE ID</th><th>Port</th><th>Service</th><th>CVSS</th><th>Summary</th></tr>${cveRows}</table>` : '<p style="color:#64748b">No CVEs detected.</p>'}
+<p style="color:#334155;margin-top:40px;font-size:11px">CloudSec Scanner — Powered by Shodan API — For authorized security assessment only.</p>
+</body></html>`;
+  download(`cloudsec_report_${d.ip}_${Date.now()}.html`, html, 'text/html');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════ */
+function getRiskColor(score){
+  if(score>=80) return'#ef4444';
+  if(score>=60) return'#f59e0b';
+  if(score>=40) return'#fbbf24';
+  return'#10b981';
+}
+function getRiskLabel(score){
+  if(score>=80) return'CRITICAL';
+  if(score>=60) return'HIGH';
+  if(score>=40) return'MEDIUM';
+  return'LOW';
+}
+function escHtml(s){
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* Enter key triggers scan */
+document.addEventListener('keydown', e => {
+  if(e.key==='Enter') startScan();
+});
+</script>
+</body>
+</html>
